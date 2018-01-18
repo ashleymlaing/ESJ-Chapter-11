@@ -5,9 +5,9 @@ function parseExpression(program) {
   program = skipSpace(program);
   //using regexp to check the 'elements' to see if its either string, word, number
   var match, expr;
-  if(match = /^"([^"]*)")/.exec(program)){
+  if(match = /^"([^"]*)"/.exec(program)){
     expr = {type: "value", value: match[1]};
-  } else if (match = /^\d+/b/.exec(program)) {
+  } else if (match = /^\d+\b/.exec(program)) {
     expr = {type: "value", value: Number(match[0])};
   } else if (match = /^[^\s(),"]+/.exec(program)) {
     expr = {type: "word", name: match[0]};
@@ -29,6 +29,8 @@ function skipSpace(string) {
 
 //parseApply
 
+//this program will check to see if there is a () to be a application/function or if its just a word
+
 function parseApply(expr, program) {
   program = skipSpace(program);
   if (program[0] != "(") {
@@ -48,4 +50,40 @@ function parseApply(expr, program) {
     }
   }
   return parseApply(expr, program.slice(1));
+}
+
+//runs all the parse functions in this one
+function parse(program) {
+  var result = parseExpression(program);
+  if (skipSpace(result.rest).length > 0) {
+    throw new SyntaxError("Unexpected text after program");
+  }
+  return result.expr;
+}
+
+var specialForms = Object.create(null);
+
+function evaluate(expr, env) {
+  switch(expr.type){
+    case "value":
+      return expr.value;
+
+    case "word":
+      if (expr.name in env) {
+        return env[expr.name];
+      } else {
+        throw new ReferenceError("Undefined variable: " + expr.name);
+      }
+    case "apply":
+      if(expr.operator.type == "word" && expr.operator.name in specialForms){
+        return specialForms[expr.operator.name](expr.args, env);
+      }
+      var op = evaluate(expr.operator, env);
+      if (typeof op != "function") {
+        throw new TypeError("Applying a non-function.");
+      }
+      return op.apply(null, expr.args.map(function(arg){
+        return evaluate(arg, env);
+      }));
+  }
 }
